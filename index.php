@@ -12,7 +12,7 @@
 
     <!-- Botão de sair alinhado à direita (na Fase 2 vira link para logout.php) -->
     <div class="topbar">
-        <a href="login.html" class="btn-back">🚪 Sair</a>
+        <a href="login.php" class="btn-back">🚪 Sair</a>
     </div>
 
     <!-- Cabeçalho de boas-vindas -->
@@ -26,7 +26,7 @@
     <div class="menu-grid">
 
         <div class="menu-card">
-            <a href="cadastro_artista.html">
+            <a href="cadastro_artista.php">
                 <div class="menu-card-icon">🎤</div>
                 <div class="menu-card-title">Gerenciar Artistas</div>
                 <div class="menu-card-desc">Cadastre e edite artistas</div>
@@ -34,7 +34,7 @@
         </div>
 
         <div class="menu-card">
-            <a href="cadastro_musica.html">
+            <a href="cadastro_musica.php">
                 <div class="menu-card-icon">🎵</div>
                 <div class="menu-card-title">Cadastrar Músicas</div>
                 <div class="menu-card-desc">Adicione músicas ao sistema</div>
@@ -42,7 +42,7 @@
         </div>
 
         <div class="menu-card">
-            <a href="listagem_musicas.html">
+            <a href="listagem_musicas.php">
                 <div class="menu-card-icon">🎼</div>
                 <div class="menu-card-title">Biblioteca Musical</div>
                 <div class="menu-card-desc">Visualize e filtre todas as músicas</div>
