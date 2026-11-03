@@ -37,7 +37,6 @@ mv cadastro_artista.html cadastro_artista.php
 mv cadastro_musica.html cadastro_musica.php
 mv listagem_musicas.html listagem_musicas.php
 
-# Rodar este comando para fazer o acima (Obs: Usar terminal bash)
 for f in *.html; do mv "$f" "${f%.html}.php"; done
 
 # arquivos novos desta fase
@@ -56,10 +55,8 @@ Abra o phpMyAdmin (normalmente em `http://localhost/phpmyadmin`), vá em **SQL**
 -- Criar banco de dados com nome modificado
 CREATE DATABASE sistema_musical_v2;
 
--- Usar o banco de dados
 USE sistema_musical_v2;
 
--- Criar tabela de usuários
 CREATE TABLE usuarios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario VARCHAR(50) NOT NULL,
