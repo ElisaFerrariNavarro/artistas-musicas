@@ -1,9 +1,61 @@
+<?php
+/*
+ * =============================================
+ * ARQUIVO: cadastro_musica.php (versão 1 — só leitura + função do YouTube)
+ * =============================================
+ */
+include('valida_sessao.php');
+include('conexao.php');
+
+// -----------------------------------------------
+// FUNÇÃO: Extrair ID do vídeo do YouTube
+// -----------------------------------------------
+// O YouTube aceita vários formatos de URL.
+// Esta função extrai o ID de 11 caracteres de qualquer um.
+//
+// URLs suportadas:
+//   https://www.youtube.com/watch?v=dQw4w9WgXcQ  → ID = dQw4w9WgXcQ
+//   https://youtu.be/dQw4w9WgXcQ
+//   https://www.youtube.com/embed/dQw4w9WgXcQ
+function getYoutubeVideoId(string $url) {
+    $patterns = [
+        '/youtube\.com\/watch\?v=([^\&\?\/]+)/',
+        '/youtube\.com\/embed\/([^\&\?\/]+)/',
+        '/youtube\.com\/v\/([^\&\?\/]+)/',
+        '/youtu\.be\/([^\&\?\/]+)/'
+    ];
+    foreach ($patterns as $p) {
+        // preg_match() testa a expressão regular; $m[1] = primeiro grupo ()
+        if (preg_match($p, $url, $m)) return $m[1];
+    }
+    return "";
+}
+
+// Filtra por um artista específico (via ?artista_id=X vindo de "🎵 Músicas")
+$artistas          = $conn->query("SELECT id, nome FROM artistas ORDER BY nome");
+$artista_id_filtro = isset($_GET['artista_id']) ? intval($_GET['artista_id']) : null;
+
+$musicas = null;
+if ($artista_id_filtro) {
+    $stmt = $conn->prepare("
+        SELECT m.*, a.nome AS artista_nome
+        FROM musicas m
+        JOIN artistas a ON m.artista_id = a.id
+        WHERE m.artista_id = ?
+        ORDER BY m.titulo
+    ");
+    $stmt->bind_param("i", $artista_id_filtro);
+    $stmt->execute();
+    $musicas = $stmt->get_result();
+    $stmt->close();
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Música — Sistema Musical</title>
+    <title>Músicas — Sistema Musical</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><text y=%27.9em%27 font-size=%2790%27>🎵</text></svg>">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -11,103 +63,50 @@
 <div class="container">
 
     <div class="page-header-bar">
-        <h2>🎵 Nova Música</h2>
+        <h2>🎵 Músicas</h2>
         <div class="header-actions">
-            <a href="cadastro_artista.html" class="btn-back">⬅ Voltar para Artistas</a>
+            <a href="cadastro_artista.php" class="btn-back">⬅ Voltar para Artistas</a>
         </div>
     </div>
 
-    <!-- FORMULÁRIO -->
-    <form method="post" action="#" enctype="multipart/form-data">
-
-        <div class="form-grid">
-
-            <!-- Linha 1: Artista + Título -->
-            <div class="form-group">
-                <label for="artista_id">Artista <span style="color:var(--red)">*</span></label>
-                <select name="artista_id" id="artista_id" required>
-                    <option value="">Selecione um artista</option>
-                    <option value="1">Djavan</option>
-                    <option value="2">Marisa Monte</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="titulo">Título <span style="color:var(--red)">*</span></label>
-                <input type="text" id="titulo" name="titulo"
-                       required placeholder="Ex: Oceano, Aquarela…">
-            </div>
-
-            <!-- Linha 2: Álbum + Gênero -->
-            <div class="form-group">
-                <label for="album">Álbum</label>
-                <input type="text" id="album" name="album" placeholder="Ex: Luz (opcional)">
-            </div>
-
-            <div class="form-group">
-                <label for="genero">Gênero</label>
-                <input type="text" id="genero" name="genero" placeholder="Ex: MPB, Rock…">
-            </div>
-
-            <!-- Linha 3: YouTube + Capa -->
-            <div class="form-group">
-                <label for="youtube_link">Link do YouTube <span style="color:var(--red)">*</span></label>
-                <input type="url" id="youtube_link" name="youtube_link"
-                       required placeholder="https://www.youtube.com/watch?v=…">
-                <small>Cole a URL do vídeo (não do canal ou playlist).</small>
-            </div>
-
-            <div class="form-group">
-                <label for="imagem_capa">Capa do Álbum</label>
-                <input type="file" id="imagem_capa" name="imagem_capa" accept="image/*">
-                <small>JPG ou PNG · Máximo 5 MB</small>
-            </div>
-
-            <!-- Linha 4: Letra (ocupa as 2 colunas) -->
-            <div class="form-group full">
-                <label for="letra">Letra da Música</label>
-                <textarea id="letra" name="letra" placeholder="Cole a letra aqui (opcional)…"></textarea>
-            </div>
-
-        </div><!-- fim .form-grid -->
-
-        <div class="form-actions">
-            <button type="submit" class="btn-primary">➕ Cadastrar</button>
+    <?php if ($musicas && $musicas->num_rows > 0): ?>
+        <h3>🎵 Músicas Cadastradas</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Álbum</th>
+                        <th class="col-youtube">YouTube</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php while ($row = $musicas->fetch_assoc()): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($row['titulo']); ?></td>
+                            <td><?php echo htmlspecialchars($row['album']) ?: '—'; ?></td>
+                            <td>
+                                <?php
+                                $vid = getYoutubeVideoId($row['youtube_link'] ?? '');
+                                if ($vid):
+                                    $watch_url = "https://www.youtube.com/watch?v={$vid}";
+                                ?>
+                                    <a href="<?php echo $watch_url; ?>" target="_blank"
+                                       rel="noopener noreferrer" class="btn-youtube">▶ Assistir</a>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
         </div>
-    </form>
-
-
-    <!-- -----------------------------------------------
-         TABELA DE MÚSICAS (dados fixos nesta fase)
-    ----------------------------------------------- -->
-    <h3>🎵 Músicas Cadastradas</h3>
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th class="col-capa">Capa</th>
-                    <th>Título</th>
-                    <th>Álbum</th>
-                    <th class="col-youtube">YouTube</th>
-                    <th class="col-acoes">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><div class="no-image">Sem<br>capa</div></td>
-                    <td>Oceano</td>
-                    <td>Luz</td>
-                    <td><a href="#" target="_blank" class="btn-youtube">▶ Assistir</a></td>
-                    <td>
-                        <div class="action-buttons">
-                            <a href="#" class="btn-edit">✏️ Editar</a>
-                            <a href="#" class="btn-delete">🗑️</a>
-                        </div>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+    <?php elseif ($artista_id_filtro): ?>
+        <p class="text-muted">Nenhuma música cadastrada para este artista ainda.</p>
+    <?php else: ?>
+        <p class="text-muted">Acesse esta página a partir de "🎵 Músicas" na lista de artistas.</p>
+    <?php endif; ?>
 
 </div>
 </body>

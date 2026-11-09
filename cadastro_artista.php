@@ -1,8 +1,14 @@
 <?php
 /*
  * =============================================
- * ARQUIVO: cadastro_artista.php (versão 3 — + editar/excluir)
+ * ARQUIVO: cadastro_artista.php (versão final — + upload de foto)
  * =============================================
+ *
+ * Operações:
+ *   C → POST sem $_POST['id']    → INSERT (novo artista)
+ *   R → query SELECT ao carregar → tabela no final da página
+ *   U → POST com $_POST['id']    → UPDATE (editar artista)
+ *   D → GET ?delete_id=X         → DELETE (excluir artista)
  */
 include('valida_sessao.php');
 include('conexao.php');
@@ -11,7 +17,39 @@ $mensagem = null;
 $class    = null;
 
 // -----------------------------------------------
-// CREATE / UPDATE
+// FUNÇÃO NOVA: Redimensionar e salvar imagem
+// -----------------------------------------------
+function redimensionarESalvarImagem(array $arquivo, $largura = 300, $altura = 300) {
+    $dir          = "img/";
+    $nome         = uniqid() . '_' . basename($arquivo["name"]); // nome único
+    $caminho      = $dir . $nome;
+    $tipo         = strtolower(pathinfo($caminho, PATHINFO_EXTENSION));
+
+    // Validações
+    if (!getimagesize($arquivo["tmp_name"]))         return "Arquivo não é uma imagem válida.";
+    if ($arquivo["size"] > 5000000)                  return "Imagem muito grande. Máximo: 5 MB.";
+    if (!in_array($tipo, ["jpg","jpeg","png"]))       return "Apenas JPG e PNG são aceitos.";
+
+    // Carrega, redimensiona e salva
+    $original      = imagecreatefromstring(file_get_contents($arquivo["tmp_name"]));
+    $w0 = imagesx($original);
+    $h0 = imagesy($original);
+    $ratio         = min($largura / $w0, $altura / $h0);
+    $nw            = (int)($w0 * $ratio);
+    $nh            = (int)($h0 * $ratio);
+    $nova          = imagecreatetruecolor($nw, $nh);
+    imagecopyresampled($nova, $original, 0, 0, 0, 0, $nw, $nh, $w0, $h0);
+
+    ($tipo === "png") ? imagepng($nova, $caminho) : imagejpeg($nova, $caminho, 90);
+
+    imagedestroy($original);
+    imagedestroy($nova);
+    return $caminho;
+}
+
+
+// -----------------------------------------------
+// CREATE / UPDATE (agora considerando a imagem)
 // -----------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id     = $_POST['id']     ?? '';
@@ -19,29 +57,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $genero = $_POST['genero'] ?? '';
     $pais   = $_POST['pais']   ?? '';
 
-    if ($id) {
-        // UPDATE: o formulário trouxe um id oculto → estamos editando
-        $stmt = $conn->prepare("UPDATE artistas SET nome=?, genero=?, pais=? WHERE id=?");
-        $stmt->bind_param("sssi", $nome, $genero, $pais, $id);
-        $mensagem = "Artista atualizado com sucesso!";
-    } else {
-        // INSERT: sem id → é um cadastro novo
-        $stmt = $conn->prepare("INSERT INTO artistas (nome, genero, pais) VALUES (?,?,?)");
-        $stmt->bind_param("sss", $nome, $genero, $pais);
-        $mensagem = "Artista cadastrado com sucesso!";
+    $imagem = "";
+    if (isset($_FILES['imagem']) && $_FILES['imagem']['error'] == 0) {
+        $upload = redimensionarESalvarImagem($_FILES['imagem']);
+        if (str_starts_with($upload, 'img/')) {
+            $imagem = $upload;
+        } else {
+            $mensagem = $upload;
+            $class    = "error";
+        }
     }
-    $class = $stmt->execute() ? "success" : "error";
-    if ($class === "error") $mensagem = "Erro: " . $stmt->error;
-    $stmt->close();
+
+    if (!isset($class)) {
+        if ($id) {
+            // UPDATE — só troca a imagem se uma nova foi enviada
+            $sql    = "UPDATE artistas SET nome=?, genero=?, pais=?";
+            $params = [$nome, $genero, $pais];
+            if ($imagem) { $sql .= ", imagem=?"; $params[] = $imagem; }
+            $sql .= " WHERE id=?"; $params[] = intval($id);
+            $stmt = $conn->prepare($sql);
+            $tipos = str_repeat('s', count($params) - 1) . 'i';
+            $stmt->bind_param($tipos, ...$params);
+            $mensagem = "Artista atualizado com sucesso!";
+        } else {
+            // INSERT
+            $stmt = $conn->prepare("INSERT INTO artistas (nome, genero, pais, imagem) VALUES (?,?,?,?)");
+            $stmt->bind_param("ssss", $nome, $genero, $pais, $imagem);
+            $mensagem = "Artista cadastrado com sucesso!";
+        }
+        $class = $stmt->execute() ? "success" : "error";
+        if ($class === "error") $mensagem = "Erro: " . $stmt->error;
+        $stmt->close();
+    }
 }
 
+
 // -----------------------------------------------
-// DELETE
+// DELETE (igual à Etapa 8c)
 // -----------------------------------------------
 if (isset($_GET['delete_id'])) {
-    $id = intval($_GET['delete_id']); // intval() garante número inteiro (evita SQL Injection)
+    $id = intval($_GET['delete_id']);
 
-    // Regra de negócio: não excluir artista com músicas cadastradas
     $chk = $conn->prepare("SELECT COUNT(*) AS total FROM musicas WHERE artista_id = ?");
     $chk->bind_param("i", $id);
     $chk->execute();
@@ -60,8 +116,9 @@ if (isset($_GET['delete_id'])) {
     }
 }
 
+
 // -----------------------------------------------
-// READ (edição e listagem)
+// READ (edição e listagem — igual à Etapa 8c)
 // -----------------------------------------------
 $artista = null;
 if (isset($_GET['edit_id'])) {
@@ -100,8 +157,12 @@ $artistas = $conn->query("SELECT * FROM artistas ORDER BY nome");
         </div>
     <?php endif; ?>
 
-    <form method="post" action="">
-        <!-- Campo oculto: carrega o ID quando estamos editando -->
+    <!--
+        FORMULÁRIO DE CADASTRO / EDIÇÃO
+        enctype="multipart/form-data" é obrigatório para envio de arquivos
+    -->
+    <form method="post" action="" enctype="multipart/form-data">
+
         <input type="hidden" name="id" value="<?php echo $artista['id'] ?? ''; ?>">
 
         <div class="form-grid">
@@ -127,7 +188,20 @@ $artistas = $conn->query("SELECT * FROM artistas ORDER BY nome");
                        placeholder="Ex: Brasil, EUA…">
             </div>
 
-        </div>
+            <div class="form-group">
+                <label for="imagem">Foto do Artista</label>
+                <input type="file" id="imagem" name="imagem" accept="image/*">
+                <small>JPG ou PNG · Máximo 5 MB<?php echo $artista ? ' · Deixe vazio para manter a foto atual' : ''; ?></small>
+
+                <?php if (!empty($artista['imagem'])): ?>
+                    <div class="current-image">
+                        <img src="<?php echo htmlspecialchars($artista['imagem']); ?>" alt="Foto atual">
+                        <small>Foto atual</small>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+        </div><!-- fim .form-grid -->
 
         <div class="form-actions">
             <button type="submit" class="btn-primary">
@@ -139,7 +213,12 @@ $artistas = $conn->query("SELECT * FROM artistas ORDER BY nome");
         </div>
     </form>
 
+
+    <!-- -----------------------------------------------
+         TABELA DE ARTISTAS CADASTRADOS
+    ----------------------------------------------- -->
     <h3>📋 Artistas Cadastrados</h3>
+
     <div class="table-container">
         <table>
             <thead>
@@ -155,7 +234,15 @@ $artistas = $conn->query("SELECT * FROM artistas ORDER BY nome");
                 <?php if ($artistas->num_rows > 0): ?>
                     <?php while ($row = $artistas->fetch_assoc()): ?>
                         <tr>
-                            <td><div class="no-image">Sem<br>foto</div></td>
+                            <td>
+                                <?php if ($row['imagem']): ?>
+                                    <img src="<?php echo htmlspecialchars($row['imagem']); ?>"
+                                         alt="<?php echo htmlspecialchars($row['nome']); ?>"
+                                         class="table-thumbnail">
+                                <?php else: ?>
+                                    <div class="no-image">Sem<br>foto</div>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo htmlspecialchars($row['nome']); ?></td>
                             <td><?php echo htmlspecialchars($row['genero']) ?: '—'; ?></td>
                             <td><?php echo htmlspecialchars($row['pais'])   ?: '—'; ?></td>
