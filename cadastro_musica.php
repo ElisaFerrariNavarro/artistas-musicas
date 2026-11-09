@@ -1,3 +1,4 @@
+
 <?php
 /*
  * =============================================
@@ -302,6 +303,37 @@ if ($artista_id_filtro) {
         </div>
     </form>
 
+    <!-- -----------------------------------------------
+         TABELA DE MÚSICAS (dados fixos nesta fase)
+    ----------------------------------------------- -->
+    <h3>🎵 Músicas Cadastradas</h3>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-capa">Capa</th>
+                    <th>Título</th>
+                    <th>Álbum</th>
+                    <th class="col-youtube">YouTube</th>
+                    <th class="col-acoes">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><div class="no-image">Sem<br>capa</div></td>
+                    <td>Oceano</td>
+                    <td>Luz</td>
+                    <td><a href="#" target="_blank" class="btn-youtube">▶ Assistir</a></td>
+                    <td>
+                        <div class="action-buttons">
+                            <a href="#" class="btn-edit">✏️ Editar</a>
+                            <a href="#" class="btn-delete">🗑️</a>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
 
 
@@ -365,6 +397,8 @@ if ($artista_id_filtro) {
     <?php endif; ?>
 
 
+</div>
+</body>
 </div>
 </body>
 </html>
